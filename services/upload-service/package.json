@@ -1,0 +1,37 @@
+{
+  "name": "upload-service",
+  "version": "1.0.0",
+  "main": "local-server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "ts-node --transpile-only ./src/local-server.ts",
+    "start:prod": "node dist/local-server.js",
+    "esbuild": "esbuild src/index.ts --bundle --platform=node --target=node18 --outdir=dist",
+    "build": "tsc"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.709.0",
+    "@aws-sdk/s3-request-presigner": "^3.709.0",
+    "@codegenie/serverless-express": "^4.16.0",
+    "axios": "^1.7.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "uuid": "^11.0.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.5.1",
+    "esbuild": "^0.24.0",
+    "nodemon": "^3.1.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.4"
+  }
+}

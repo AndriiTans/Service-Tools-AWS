@@ -1,0 +1,251 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches:
+      - deploy
+
+jobs:
+  auth-service:
+    if: contains(github.event.head_commit.message, '[auth-service]')
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_REGION: us-east-1
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install Root Dependencies
+        working-directory: .
+        run: npm install
+
+      - name: Install Dependencies for Auth Service
+        working-directory: services/auth-service
+        run: npm install
+
+      - name: Build and Package Auth Service
+        working-directory: services/auth-service
+        run: |
+          npm run build
+          npm prune --production
+          zip -r auth-service.zip dist node_modules package.json
+          mv auth-service.zip ../../aws-deploy/dist-package-auth.zip
+
+      - name: Deploy Auth Service to AWS
+        env:
+          ROLE_NAME: upload-service-role
+          LAMBDA_FUNCTION_NAME: auth-service
+          ZIP_FILE_PATH: ./aws-deploy/dist-package-auth.zip
+          HANDLER_PATH: dist/lambda.handler
+          GATEWAY_API: app-api-gateway
+          GATEWAY_API_SERVICE_PATH_PART: auth
+          SERVICE_ENV_VARS: >
+            {
+              "COGNITO_CLIENT_ID": "${{ vars.COGNITO_CLIENT_ID }}"
+            }
+        run: node aws-deploy/deploy-lambda.js
+
+  deploy-upload-service:
+    if: contains(github.event.head_commit.message, '[upload-service]')
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_REGION: us-east-1
+      S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install Root Dependencies
+        working-directory: .
+        run: npm install
+
+      - name: Install Dependencies for Upload Service
+        working-directory: services/upload-service
+        run: npm install
+
+      - name: Build and Package Upload Service
+        working-directory: services/upload-service
+        run: |
+          npm run build
+          npm prune --production
+          zip -r upload-service.zip dist node_modules package.json
+          mv upload-service.zip ../../aws-deploy/dist-package-upload.zip
+
+      - name: Deploy Upload Service to AWS
+        env:
+          ROLE_NAME: upload-service-role
+          LAMBDA_FUNCTION_NAME: upload-service
+          ZIP_FILE_PATH: ./aws-deploy/dist-package-upload.zip
+          HANDLER_PATH: dist/lambda.handler
+          GATEWAY_API: app-api-gateway
+          GATEWAY_API_SERVICE_PATH_PART: upload
+          SERVICE_ENV_VARS: >
+            {
+              "S3_BUCKET_NAME": "${{ vars.S3_BUCKET_NAME }}"
+            }
+        run: node aws-deploy/deploy-lambda.js
+
+  deploy-parser-service:
+    if: contains(github.event.head_commit.message, '[parser-service]')
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_REGION: us-east-1
+      AWS_SQS_QUEUE_NAME: MyCoolQueue
+      S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install Root Dependencies
+        working-directory: .
+        run: npm install
+
+      - name: Install Dependencies for Parser Service
+        working-directory: services/parser-service
+        run: npm install
+
+      - name: Build and Package Parser Service
+        working-directory: services/parser-service
+        run: |
+          npm run build
+          npm prune --production
+          zip -r parser-service.zip dist node_modules package.json
+          mv parser-service.zip ../../aws-deploy/dist-package-parser.zip
+
+      - name: Deploy Parser Service to AWS
+        env:
+          ROLE_NAME: upload-service-role
+          LAMBDA_FUNCTION_NAME: parser-service
+          ZIP_FILE_PATH: ./aws-deploy/dist-package-parser.zip
+          # HANDLER_PATH: dist/lambda.handler
+          HANDLER_PATH: dist/lambda-sqs.handler
+          GATEWAY_API: app-api-gateway
+          GATEWAY_API_SERVICE_PATH_PART: parser
+          SERVICE_ENV_VARS: >
+            {
+              "S3_BUCKET_NAME": "${{ vars.S3_BUCKET_NAME }}",
+              "AWS_SQS_QUEUE_NAME": "MyCoolQueue",
+              "MONGO_URI": "${{ vars.PARSER_MONGO_URI }}"
+            }
+        run: node aws-deploy/deploy-lambda.js
+
+  deploy-content-service:
+    if: contains(github.event.head_commit.message, '[content-service]')
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_REGION: us-east-1
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install Root Dependencies
+        working-directory: .
+        run: npm install
+
+      - name: Install Dependencies for Content Service
+        working-directory: services/content-feed-service
+        run: npm install
+
+      - name: Build and Package Content Service
+        working-directory: services/content-feed-service
+        run: |
+          npm run build
+          npm prune --production
+          zip -r content-feed-service.zip dist node_modules package.json
+          mv content-feed-service.zip ../../aws-deploy/dist-package-content-feed.zip
+
+      - name: Deploy Content Service to AWS
+        env:
+          ROLE_NAME: upload-service-role
+          LAMBDA_FUNCTION_NAME: content-feed-service
+          ZIP_FILE_PATH: ./aws-deploy/dist-package-content-feed.zip
+          HANDLER_PATH: dist/lambda.handler
+          GATEWAY_API: app-api-gateway
+          GATEWAY_API_SERVICE_PATH_PART: content-feed
+          SERVICE_ENV_VARS: >
+            {
+              "MONGO_URI": "${{ vars.PARSER_MONGO_URI }}"
+            }
+        run: node aws-deploy/deploy-lambda.js
+
+  deploy-frontend:
+    if: contains(github.event.head_commit.message, '[frontend]')
+    runs-on: ubuntu-latest
+
+    env:
+      LAMBDA_ROLE_NAME: upload-service-role
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_REGION: us-east-1
+      S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }}
+      AWS_SQS_QUEUE_NAME: MyCoolQueue
+      CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+      VITE_BASE_API_URL: ${{ vars.BASE_API_URL }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install Root Dependencies
+        run: npm install
+
+      - name: Build Frontend
+        working-directory: services/frontend
+        run: |
+          npm install
+          npm run build
+
+      - name: Deploy to S3
+        run: node aws-deploy/upload-frontend-to-s3.js
+
+      - name: S3 SQS Setup
+        run: node aws-deploy/s3-sqs-setup.js
+
+      - name: Invalidate CloudFront Cache
+        run: node aws-deploy/invalidate-cloudfront-cache.js
