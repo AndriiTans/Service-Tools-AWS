@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import apiClient from '../../../../utils/httpClient';
 import { LoadingModal } from '../../../../components';
 
@@ -36,7 +37,7 @@ const Upload = () => {
       for (const [index, file] of Array.from(selectedFiles).entries()) {
         const { url, key } = responseData.uploadUrls[index];
 
-        await apiClient.put(url, file, {
+        await axios.put(url, file, {
           headers: {
             'Content-Type': file.type,
           },

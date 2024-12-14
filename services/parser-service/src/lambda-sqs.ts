@@ -75,7 +75,7 @@ export const handler = async (event: SqsEvent): Promise<void> => {
         objectKey = decodeURIComponent(s3Record.s3.object.key);
 
         console.log(`Processing file: ${objectKey} from bucket: ${bucketName}`);
-
+        //
         // Fetch the object from S3
         const getObjectParams = {
           Bucket: bucketName,
@@ -111,7 +111,10 @@ export const handler = async (event: SqsEvent): Promise<void> => {
                 return null;
               }
 
-              if (!content.message.content.parts[0]) {
+              console.log('message');
+              console.log('content.message.content.parts -> ', content.message.content.parts);
+
+              if (!content.message.content?.parts?.[0]) {
                 return null;
               }
 

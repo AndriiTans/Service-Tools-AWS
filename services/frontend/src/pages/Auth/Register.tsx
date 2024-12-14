@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import apiClient from '../../utils/httpClient';
+import { Modal } from '../../components';
 
 const Register = () => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -10,6 +13,8 @@ const Register = () => {
   });
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
@@ -17,7 +22,7 @@ const Register = () => {
     setErrorMessage(null);
   };
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
     if (formData.password !== formData.confirmPassword) {
@@ -25,8 +30,32 @@ const Register = () => {
       return;
     }
 
-    console.log('Registering user:', formData);
-    alert('Registration successful!');
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    try {
+      const response = await apiClient.post('/auth/register', {
+        username: formData.name,
+        email: formData.email,
+        password: formData.password,
+      });
+
+      console.log('response ', response);
+
+      setIsModalOpen(true);
+    } catch (error) {
+      if (error instanceof Error) {
+        setErrorMessage(
+          error.message || 'An error occurred during registration. Please try again.',
+        );
+        console.error(error);
+      } else {
+        setErrorMessage('An unexpected error occurred.');
+        console.error('Unexpected error:', error);
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -107,8 +136,9 @@ const Register = () => {
           <button
             type="submit"
             className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition"
+            disabled={isLoading}
           >
-            Register
+            {isLoading ? 'Registering...' : 'Register'}
           </button>
         </div>
       </form>
@@ -116,12 +146,24 @@ const Register = () => {
       <p className="text-center text-gray-600 mt-6">
         Already have an account?{' '}
         <Link
-          to="/login"
+          to="/auth/login"
           className="text-blue-600 font-medium hover:underline hover:text-blue-800 transition"
         >
           Login here
         </Link>
       </p>
+      <Modal
+        isOpen={isModalOpen}
+        title="Congrats!"
+        content={<p>Registration successful! You can now log in.</p>}
+        onClose={() => setIsModalOpen(false)}
+        onConfirm={() => {
+          setIsModalOpen(false);
+          navigate('/auth/login');
+        }}
+        confirmLabel="Go to Login"
+        cancelLabel="Close"
+      />
     </div>
   );
 };

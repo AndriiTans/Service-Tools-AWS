@@ -1,8 +1,8 @@
 import React from 'react';
 import { Outlet } from 'react-router-dom';
 
-const Parser = () => {
+const ParserLayout = () => {
   return <Outlet />;
 };
 
-export default Parser;
+export default ParserLayout;

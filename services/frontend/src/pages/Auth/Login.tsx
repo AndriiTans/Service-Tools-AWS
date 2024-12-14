@@ -1,13 +1,19 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import apiClient from '../../utils/httpClient';
+import useAuth from '../../hooks/useAuth';
 
 const Login = () => {
+  const navigate = useNavigate();
+  const { refreshAuthState } = useAuth();
+
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
@@ -15,7 +21,7 @@ const Login = () => {
     setErrorMessage(null);
   };
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
     if (!formData.email || !formData.password) {
@@ -23,8 +29,34 @@ const Login = () => {
       return;
     }
 
-    console.log('Logging in user:', formData);
-    alert('Login successful!');
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    try {
+      const response = await apiClient.post('/auth/login', {
+        email: formData.email,
+        password: formData.password,
+      });
+
+      const { tokens } = response.data;
+      localStorage.setItem('authToken', tokens.IdToken);
+      localStorage.setItem('refreshToken', tokens.RefreshToken);
+
+      console.log('Login successful:', response.data);
+
+      // Refresh auth state and navigate to dashboard
+      refreshAuthState();
+      // navigate('/dashboard/parser/results');
+    } catch (error) {
+      if (error instanceof Error) {
+        setErrorMessage(error.message || 'Login failed. Please try again.');
+      } else {
+        setErrorMessage('An unexpected error occurred.');
+      }
+      console.error('Error during login:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -70,8 +102,9 @@ const Login = () => {
           <button
             type="submit"
             className="w-full py-2 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition duration-300"
+            disabled={isLoading}
           >
-            Login
+            {isLoading ? 'Logging in...' : 'Login'}
           </button>
         </div>
       </form>
@@ -79,7 +112,7 @@ const Login = () => {
       <p className="text-center text-gray-600 mt-6">
         Don't have an account?{' '}
         <Link
-          to="/register"
+          to="/auth/register"
           className="text-blue-600 font-medium hover:underline hover:text-blue-800 transition duration-300"
         >
           Register here

@@ -70,3 +70,6 @@ This repository contains a set of AWS Lambda functions that work together to han
 
 - Use the AWS SDK or AWS SAM CLI to package and deploy the Lambda functions.
 - Ensure each Lambda function is assigned the appropriate IAM role with the necessary permissions.
+
+## Table of Contents
+- [CloudFront](./docs/CloudFront.md)

@@ -8,7 +8,29 @@ dotenv.config();
 
 const app = express();
 
-app.use(cors());
+/// CORS Configuration
+const corsOptions = {
+  // origin: process.env.FRONTEND_URL || '*', // Replace with your frontend URL in production
+  origin: '*', // Replace with your frontend URL in production
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'], // Include necessary headers
+  credentials: true, // Allow cookies and Authorization headers
+};
+
+// Apply CORS middleware
+app.use(cors(corsOptions));
+
+// Explicitly handle preflight requests
+app.options('*', (req, res) => {
+  // res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_URL || '*');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.sendStatus(200);
+});
+// app.use(cors());
+////
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(logger);

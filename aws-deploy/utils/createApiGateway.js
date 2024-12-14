@@ -1,5 +1,4 @@
 const { LambdaClient, AddPermissionCommand } = require('@aws-sdk/client-lambda');
-
 const {
   APIGatewayClient,
   CreateRestApiCommand,
@@ -7,9 +6,14 @@ const {
   CreateResourceCommand,
   PutMethodCommand,
   PutIntegrationCommand,
+  UpdateGatewayResponseCommand,
+  PutMethodResponseCommand,
   CreateDeploymentCommand,
   GetRestApisCommand,
+  UpdateIntegrationResponseCommand,
 } = require('@aws-sdk/client-api-gateway');
+
+const { setupCognitoAndAttachAuthorizer } = require('./cognito-setup');
 
 /**
  * Adds permission to the Lambda function for API Gateway invocation.
@@ -84,23 +88,202 @@ const ensureResourceExists = async (restApiId, pathPart) => {
 };
 
 /**
+ * Adds an integration response to a specific method in API Gateway.
+ * @param {string} restApiId - The API Gateway ID
+ * @param {string} resourceId - The resource ID where the integration exists
+ * @param {string} httpMethod - The HTTP method (e.g., GET, POST)
+ * @param {string} statusCode - The status code for the response
+ * @param {object} responseParameters - Response parameters to configure
+ * @param {object} responseTemplates - Response templates to configure
+ */
+const addIntegrationResponse = async (
+  restApiId,
+  resourceId,
+  httpMethod,
+  statusCode,
+  responseParameters = {},
+  responseTemplates = {},
+) => {
+  const client = new APIGatewayClient({ region: process.env.AWS_REGION || 'us-east-1' });
+
+  try {
+    const command = new UpdateIntegrationResponseCommand({
+      restApiId,
+      resourceId,
+      httpMethod,
+      statusCode,
+      patchOperations: [
+        {
+          op: 'add',
+          path: '/responseParameters',
+          value: JSON.stringify(responseParameters),
+        },
+        {
+          op: 'add',
+          path: '/responseTemplates',
+          value: JSON.stringify(responseTemplates),
+        },
+      ],
+    });
+
+    await client.send(command);
+    console.log(`Integration response added for ${httpMethod} ${statusCode}`);
+  } catch (error) {
+    console.error(
+      `Error adding integration response for ${httpMethod} ${statusCode}:`,
+      error.message,
+    );
+    throw error;
+  }
+};
+
+const addCORSOptionsForSubpath = async (restApiId, resourceId) => {
+  const client = new APIGatewayClient({ region: process.env.AWS_REGION || 'us-east-1' });
+
+  const corsHeaders = {
+    'method.response.header.Access-Control-Allow-Headers':
+      "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'",
+    'method.response.header.Access-Control-Allow-Methods':
+      "'DELETE,GET,HEAD,OPTIONS,PATCH,POST,PUT'",
+    'method.response.header.Access-Control-Allow-Origin': "'*'",
+    'method.response.header.Access-Control-Allow-Credentials': 'true', // Set as a Boolean-compatible string
+  };
+
+  try {
+    // Step 1: Create OPTIONS method
+    const putMethodCommand = new PutMethodCommand({
+      restApiId,
+      resourceId,
+      httpMethod: 'OPTIONS',
+      authorizationType: 'NONE',
+    });
+    await client.send(putMethodCommand);
+
+    // Step 2: Integrate the OPTIONS method with a MOCK integration
+    const putIntegrationCommand = new PutIntegrationCommand({
+      restApiId,
+      resourceId,
+      httpMethod: 'OPTIONS',
+      type: 'MOCK',
+      requestTemplates: {
+        'application/json': '{"statusCode": 200}',
+      },
+      integrationResponses: [
+        {
+          statusCode: '200',
+          responseParameters: corsHeaders,
+          responseTemplates: {
+            'application/json': '{"status": "CORS enabled"}',
+          },
+        },
+      ],
+    });
+    await client.send(putIntegrationCommand);
+
+    // Step 3: Set up the method response for OPTIONS
+    const putMethodResponseCommand = new PutMethodResponseCommand({
+      restApiId,
+      resourceId,
+      httpMethod: 'OPTIONS',
+      statusCode: '200',
+      responseParameters: {
+        'method.response.header.Access-Control-Allow-Headers': true,
+        'method.response.header.Access-Control-Allow-Methods': true,
+        'method.response.header.Access-Control-Allow-Origin': true,
+        'method.response.header.Access-Control-Allow-Credentials': true, // Use a Boolean value
+      },
+    });
+    await client.send(putMethodResponseCommand);
+
+    console.log(
+      `CORS integration response configured for OPTIONS method on resource ID: ${resourceId}`,
+    );
+  } catch (error) {
+    console.error(`Error enabling CORS for OPTIONS method:`, error.message);
+    throw error;
+  }
+};
+
+/**
+ * Enables CORS for Default 4XX and 5XX Gateway Responses.
+ * @param {string} restApiId - The ID of the API Gateway
+ */
+const enableCORSForDefaultGatewayResponses = async (restApiId) => {
+  const client = new APIGatewayClient({ region: process.env.AWS_REGION || 'us-east-1' });
+
+  const corsHeaders = {
+    'Access-Control-Allow-Headers': "'Content-Type,Authorization,X-Api-Key,X-Amz-Security-Token'",
+    'Access-Control-Allow-Methods': "'DELETE,GET,HEAD,OPTIONS,PATCH,POST,PUT'",
+    'Access-Control-Allow-Origin': "'*'",
+    'Access-Control-Allow-Credentials': "'true'",
+  };
+
+  const updateGatewayResponse = async (responseType) => {
+    try {
+      const command = new UpdateGatewayResponseCommand({
+        restApiId,
+        responseType,
+        patchOperations: [
+          {
+            op: 'replace',
+            path: '/responseParameters/gatewayresponse.header.Access-Control-Allow-Headers',
+            value: corsHeaders['Access-Control-Allow-Headers'],
+          },
+          {
+            op: 'replace',
+            path: '/responseParameters/gatewayresponse.header.Access-Control-Allow-Methods',
+            value: corsHeaders['Access-Control-Allow-Methods'],
+          },
+          {
+            op: 'replace',
+            path: '/responseParameters/gatewayresponse.header.Access-Control-Allow-Origin',
+            value: corsHeaders['Access-Control-Allow-Origin'],
+          },
+          {
+            op: 'replace',
+            path: '/responseParameters/gatewayresponse.header.Access-Control-Allow-Credentials',
+            value: corsHeaders['Access-Control-Allow-Credentials'],
+          },
+        ],
+      });
+      await client.send(command);
+      console.log(`CORS enabled for ${responseType}`);
+    } catch (error) {
+      console.error(`Failed to enable CORS for ${responseType}:`, error.message);
+    }
+  };
+
+  // Enable CORS for Default 4XX and 5XX responses
+  await updateGatewayResponse('DEFAULT_4XX');
+  await updateGatewayResponse('DEFAULT_5XX');
+};
+
+/**
  * Adds the ANY HTTP method to a resource in an API Gateway.
  * @param {string} restApiId - The API Gateway ID
  * @param {string} resourceId - The resource ID
  * @param {string} integrationUri - The URI for Lambda integration
+ * @param {string} authorizerId - The Cognito Authorizer ID
  */
-const addAnyMethodToResource = async (restApiId, resourceId, integrationUri) => {
-  const client = new APIGatewayClient({ region: 'us-east-1' });
+const addAnyMethodToResource = async (restApiId, resourceId, integrationUri, authorizerId) => {
+  const client = new APIGatewayClient({ region: process.env.AWS_REGION || 'us-east-1' });
 
   console.log(`Adding ANY method to resource ID: ${resourceId}...`);
 
   try {
-    // Step 1: Add the ANY method to the resource
+    // Step 1: Add the ANY method with Cognito Authorization
+    console.log('authorizerId');
+    console.log('authorizerId', authorizerId);
+    console.log('authorizerId');
+    const authParams = authorizerId
+      ? { authorizationType: 'COGNITO_USER_POOLS', authorizerId }
+      : { authorizationType: 'NONE' };
+
     const putMethodCommand = new PutMethodCommand({
+      ...authParams,
       restApiId,
       resourceId,
       httpMethod: 'ANY',
-      authorizationType: 'NONE',
     });
     await client.send(putMethodCommand);
 
@@ -126,6 +309,7 @@ const addAnyMethodToResource = async (restApiId, resourceId, integrationUri) => 
  * Creates an API Gateway and integrates it with a Lambda function.
  * @param {string} apiName - The name of the API Gateway
  * @param {string} lambdaArn - The ARN of the Lambda function to integrate
+ * @param {string} pathPart - The path for the resource
  * @returns {Promise<string>} - The endpoint URL of the deployed API
  */
 const createApiGateway = async (apiName, lambdaArn, pathPart) => {
@@ -182,6 +366,14 @@ const createApiGateway = async (apiName, lambdaArn, pathPart) => {
     const subPathResource = await client.send(createSubPathCommand);
     console.log(`Sub-path '/${pathPart}' created with ID: ${subPathResource.id}`);
 
+    // /////////////
+    // /////////////
+    // /////////////
+    // // Enable CORS for the subpath
+    // await addCORSOptionsForSubpath(restApi.id, subPathResource.id);
+    // /////////////
+    // /////////////
+    // /////////////
     // Step 4: Create a `{proxy+}` resource under `/${pathPart}`
     const createProxyCommand = new CreateResourceCommand({
       restApiId: restApi.id,
@@ -193,12 +385,50 @@ const createApiGateway = async (apiName, lambdaArn, pathPart) => {
       `Proxy resource '{proxy+}' created under '/${pathPart}' with ID: ${proxyResource.id}`,
     );
 
+    /////////////
+    /////////////
+    /////////////
+    // Enable CORS for the subpath
+    // await enableCORSForDefaultGatewayResponses(restApi.id);
+
+    // await addCORSOptionsForSubpath(restApi.id, proxyResource.id);
+    // Enable CORS for Default 4XX and 5XX responses
+    /////////////
+    /////////////
+    /////////////
+
+    // Step: Set up Cognito
+    let authorizerId = null;
+    if (pathPart !== 'auth') {
+      console.log('Setting up Cognito...');
+      const congnitoResponse = await setupCognitoAndAttachAuthorizer();
+      authorizerId = congnitoResponse.authorizerId;
+      console.log('Cognito Setup Complete:', authorizerId, congnitoResponse);
+    }
+
     // Step 5: Add ANY method to the proxy resource
     const integrationUri = `arn:aws:apigateway:${
       process.env.AWS_REGION || 'us-east-1'
     }:lambda:path/2015-03-31/functions/${lambdaArn}/invocations`;
 
     await addAnyMethodToResource(restApi.id, proxyResource.id, integrationUri);
+
+    // Step 5: Add integration response for ANY method
+    const responseParameters = {
+      'method.response.header.Content-Type': "'application/json'",
+    };
+    const responseTemplates = {
+      'application/json': '{"status": "success", "data": $input.json(\'$\') }',
+    };
+
+    // await addIntegrationResponse(
+    //   restApi.id,
+    //   proxyResource.id,
+    //   'ANY',
+    //   '200',
+    //   responseParameters,
+    //   responseTemplates,
+    // );
 
     // Step 6: Add Lambda permissions for API Gateway
     const apiGatewayArn = `arn:aws:execute-api:${process.env.AWS_REGION || 'us-east-1'}:${

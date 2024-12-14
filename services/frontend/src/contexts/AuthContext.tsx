@@ -1,8 +1,10 @@
-import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useEffect, ReactNode } from 'react';
+import apiClient from '../utils/httpClient';
 
 interface AuthContextProps {
   isLoading: boolean;
   isAuthenticated: boolean;
+  refreshAuthState: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextProps | null>(null);
@@ -13,51 +15,50 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  const checkAuth = async () => {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      setIsAuthenticated(false);
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const response = await apiClient.get('/auth/verify-token', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.status === 200) {
+        setIsAuthenticated(true);
+      } else {
+        setIsAuthenticated(false);
+      }
+    } catch (error) {
+      console.error('Error validating token:', error);
+      setIsAuthenticated(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const token = localStorage.getItem('authToken');
-      if (!token) {
-        // setIsAuthenticated(false);
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        const response = await fetch(import.meta.env.VITE_API_VALIDATE_TOKEN as string, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (response.ok) {
-          setIsAuthenticated(true);
-        } else {
-          setIsAuthenticated(false);
-        }
-      } catch (error) {
-        console.error('Error validating token:', error);
-        setIsAuthenticated(false);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     checkAuth();
   }, []);
 
+  const refreshAuthState = async () => {
+    setIsLoading(true);
+    await checkAuth();
+  };
+
   return (
-    <AuthContext.Provider value={{ isLoading, isAuthenticated }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ isLoading, isAuthenticated, refreshAuthState }}>
+      {children}
+    </AuthContext.Provider>
   );
 };
 
-export const useAuth = (): AuthContextProps => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+export { AuthContext };

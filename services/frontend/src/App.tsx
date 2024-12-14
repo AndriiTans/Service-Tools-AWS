@@ -1,52 +1,72 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import Layout from './Layout';
 import ProtectedLayout from './ProtectedLayout';
 import {
   Dashboard,
   Home,
   Login,
   NotFound,
-  Parser,
+  ParserLayout,
   ParserResultDetails,
   ParserResults,
   Register,
   Upload,
 } from './pages';
 import NonAuthLayout from './NonAuthLayout';
-import { useAuth, AuthProvider } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/AuthContext';
+import useAuth from './hooks/useAuth';
+
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? children : <Navigate to="/auth/login" replace />;
+};
 
 const AppContent = () => {
   const { isLoading, isAuthenticated } = useAuth();
 
   if (isLoading) {
-    return <div>Loading...</div>; // Replace with a custom loading component if needed
+    return <div>Loading...</div>;
   }
 
   return (
     <Routes>
-      <Route element={isAuthenticated ? <Layout /> : <NonAuthLayout />}>
-        <Route path="/" element={<Home />} />
-
-        <Route path="login" element={<Login />} />
-        <Route path="register" element={<Register />} />
-
-        <Route
-          path="dashboard"
-          element={isAuthenticated ? <ProtectedLayout /> : <Navigate to="/login" replace />}
-        >
-          <Route path="" element={<Dashboard />} />
-          <Route path="parser" element={<Parser />}>
-            <Route path="upload" element={<Upload />} />
-            <Route path="results" element={<ParserResults />}>
-              <Route path=":id" element={<ParserResultDetails />} />
-            </Route>
-
-            <Route index element={<Navigate to="/" replace />} />
-          </Route>
+      {/* Public Routes */}
+      <Route
+        path="/"
+        element={!isAuthenticated ? <NonAuthLayout /> : <Navigate to="/dashboard" replace />}
+      >
+        <Route index element={<Home />} />
+        <Route path="auth">
+          <Route
+            path="login"
+            element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />}
+          />
+          <Route
+            path="register"
+            element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Register />}
+          />
         </Route>
       </Route>
 
+      {/* Protected Routes */}
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <ProtectedLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<Dashboard />} />
+        <Route path="parser" element={<ParserLayout />}>
+          <Route index element={<Navigate to="upload" replace />} />
+          <Route path="upload" element={<Upload />} />
+          <Route path="results" element={<ParserResults />} />
+          <Route path="results/file/:id" element={<ParserResultDetails />} />
+        </Route>
+      </Route>
+
+      {/* 404 Not Found */}
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

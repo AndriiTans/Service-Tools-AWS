@@ -16,7 +16,7 @@ const NonAuthLayout = () => {
               </li>
               <li>
                 <Link
-                  to="/register"
+                  to="/auth/register"
                   className="text-white hover:text-blue-200 transition duration-300"
                 >
                   Register
@@ -24,7 +24,7 @@ const NonAuthLayout = () => {
               </li>
               <li>
                 <Link
-                  to="/login"
+                  to="/auth/login"
                   className="text-white hover:text-blue-200 transition duration-300"
                 >
                   Login
