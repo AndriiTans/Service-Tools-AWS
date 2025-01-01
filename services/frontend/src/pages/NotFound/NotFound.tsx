@@ -13,14 +13,6 @@ const NotFound = () => {
           Go Back Home
         </a>
       </div>
-
-      <div className="mt-12">
-        <img
-          src="https://via.placeholder.com/400x300.png?text=Not+Found"
-          alt="Not Found Illustration"
-          className="max-w-full h-auto"
-        />
-      </div>
     </div>
   );
 };
