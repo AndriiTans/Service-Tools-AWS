@@ -79,7 +79,7 @@ const ParserResults = () => {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {filenames.map((filename, index) => (
+        {filenames?.map((filename, index) => (
           <div
             key={index}
             className="relative from-blue-50 to-blue-100 border border-gray-200 rounded-xl shadow-md hover:shadow-xl transition-all duration-300 group"
