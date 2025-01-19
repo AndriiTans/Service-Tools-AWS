@@ -4,6 +4,8 @@ import cors from 'cors';
 import logger from './utils/logger';
 import {
   deleteMessagesByFileName,
+  getAllUserMessagesByFilename,
+  getAllUserMessagesInAllFiles,
   getParsedContent,
   getUniqueFilenames,
 } from './handlers/contentHandler';
@@ -56,6 +58,10 @@ app.get('/get-all-filenames', getUniqueFilenames);
 app.get('/get-parsed-content', getParsedContent);
 
 app.delete('/delete-messages-by-filename', deleteMessagesByFileName);
+
+app.get('/get-all-user-messages', getAllUserMessagesInAllFiles);
+
+app.post('/get-user-messages-by-filename', getAllUserMessagesByFilename);
 
 app.get('/health', (req: Request, res: Response) => {
   console.log('req.Method:', req.method, req.path);

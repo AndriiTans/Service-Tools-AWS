@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import Message from '../models/message.model';
 
+const USER_ROLE = 'user';
+
 export const getParsedContent = async (req: Request, res: Response): Promise<void> => {
   try {
     const { fileName } = req.query;
@@ -40,6 +42,52 @@ export const getUniqueFilenames = async (req: Request, res: Response): Promise<v
   } catch (error) {
     console.error('Error fetching unique filenames:', error);
     res.status(500).json({ error: 'Failed to fetch unique filenames from the database.' });
+  }
+};
+
+export const getAllUserMessagesInAllFiles = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userMessages = await Message.find({ authorRole: USER_ROLE }).lean();
+
+    if (!userMessages.length) {
+      res.status(404).json({ message: 'No user messages found' });
+      return;
+    }
+
+    const messages = userMessages.map((el) => el.content);
+
+    res.status(200).json(messages);
+  } catch (error) {
+    console.error('Error fetching all user messages:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to fetch all user messages from the database.' });
+  }
+};
+
+export const getAllUserMessagesByFilename = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { fileNames } = req.body;
+
+    if (!fileNames.length) {
+      res.status(400).json({ error: 'fileNames parameter is required' });
+      return;
+    }
+
+    const userMessages = await Message.find({
+      fileName: { $in: fileNames },
+      authorRole: USER_ROLE,
+    }).lean();
+
+    if (!userMessages.length) {
+      res.status(404).json({ message: 'No user messages found for the specified file' });
+      return;
+    }
+
+    const messages = userMessages.map((el) => el.content);
+
+    res.status(200).json(messages);
+  } catch (error) {
+    console.error('Error fetching user messages by filename:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to fetch user messages from the database.' });
   }
 };
 
