@@ -59,7 +59,7 @@ const MessageSchema: Schema<IMessage> = new mongoose.Schema(
 );
 
 // Create a compound index to ensure order is unique within the same bucketName
-MessageSchema.index({ order: 1, bucketName: 1 }, { unique: true });
+MessageSchema.index({ order: 1, bucketName: 1, fileName: 1 }, { unique: true });
 
 const Message = mongoose.model<IMessage>('Message', MessageSchema);
 
