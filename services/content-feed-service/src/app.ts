@@ -52,7 +52,6 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(logger);
 
-// Routes
 app.get('/get-all-filenames', getUniqueFilenames);
 
 app.get('/get-parsed-content', getParsedContent);
