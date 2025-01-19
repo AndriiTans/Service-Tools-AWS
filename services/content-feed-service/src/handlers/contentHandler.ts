@@ -55,7 +55,7 @@ export const getAllUserMessagesInAllFiles = async (req: Request, res: Response):
     }
 
     const messages = userMessages.map((el) => el.content);
-
+    //
     res.status(200).json(messages);
   } catch (error) {
     console.error('Error fetching all user messages:', error.message, error.stack);
