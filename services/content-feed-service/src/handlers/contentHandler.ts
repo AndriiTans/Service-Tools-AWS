@@ -82,8 +82,17 @@ export const getAllUserMessagesByFilename = async (req: Request, res: Response):
       return;
     }
 
-    const messages = userMessages.map((el) => el.content);
-    res.status(200).json(messages);
+    const groupedMessages = fileNames.map((fileName) => {
+      const messagesForFile = userMessages.filter((el) => el.fileName === fileName);
+      const content = messagesForFile.map((el) => el.content);
+
+      return {
+        fileName,
+        content,
+      };
+    });
+
+    res.status(200).json(groupedMessages);
   } catch (error) {
     console.error('Error fetching user messages by filename:', error.message, error.stack);
     res.status(500).json({ error: 'Failed to fetch user messages from the database.' });
