@@ -1,20 +1,31 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import apiClient from '../../../../utils/httpClient';
 
+interface ContentItem {
+  content_type: string;
+  parts: string[];
+}
+
+interface GroupedMessages {
+  fileName: string;
+  content: string[];
+}
+
 const UserMessagesList: React.FC = () => {
   const [filenames, setFilenames] = useState<string[]>([]);
   const [selectedFilenames, setSelectedFilenames] = useState<string[]>([]);
-  const [userMessages, setUserMessages] = useState<string[]>([]);
+  const [userMessages, setUserMessages] = useState<GroupedMessages[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
+  const [messagesCount, setMessagesCount] = useState<number>(0);
 
   useEffect(() => {
     const fetchFilenames = async () => {
       setLoading(true);
       setError(null);
       try {
-        const response = await apiClient.get('/content-feed/get-all-filenames');
+        const response = await apiClient.get<string[]>('/content-feed/get-all-filenames');
         setFilenames(response.data);
       } catch (error: unknown) {
         setError((error as Error).message || 'Failed to fetch filenames.');
@@ -25,7 +36,7 @@ const UserMessagesList: React.FC = () => {
     fetchFilenames();
   }, []);
 
-  const handleFileSelection = (filename: string) => {
+  const handleFileSelection = (filename: string): void => {
     setSelectedFilenames((prev) =>
       prev.includes(filename) ? prev.filter((f) => f !== filename) : [...prev, filename],
     );
@@ -41,11 +52,25 @@ const UserMessagesList: React.FC = () => {
     setError(null);
 
     try {
-      const response = await apiClient.post('/content-feed/get-user-messages-by-filename', {
-        fileNames: selectedFilenames,
-      });
+      const response = await apiClient.post<{ fileName: string; content: ContentItem[] }[]>(
+        '/content-feed/get-user-messages-by-filename',
+        {
+          fileNames: selectedFilenames,
+        },
+      );
 
-      setUserMessages(response.data.flatMap((item: { parts: string[] }) => item.parts));
+      const groupedMessages: GroupedMessages[] = response.data.map((item) => ({
+        fileName: item.fileName,
+        content: item.content.flatMap((contentItem) => contentItem.parts), // Flatten the 'parts' array
+      }));
+
+      setUserMessages(groupedMessages);
+
+      const totalMessages = groupedMessages.reduce(
+        (count, msgGroup) => count + msgGroup.content.length,
+        0,
+      );
+      setMessagesCount(totalMessages);
     } catch (err: unknown) {
       setError((err as Error).message || 'Failed to fetch user messages.');
     } finally {
@@ -53,14 +78,20 @@ const UserMessagesList: React.FC = () => {
     }
   }, [selectedFilenames]);
 
-  const handleBack = () => {
+  const handleBack = (): void => {
     setUserMessages([]);
     setSelectedFilenames([]);
     setCopySuccess(null);
   };
 
-  const handleCopy = () => {
-    const textToCopy = userMessages.map((msg, idx) => `${idx + 1}. ${msg}`).join('\n');
+  const handleCopy = (): void => {
+    let globalIndex = 1;
+    const textToCopy = userMessages
+      .map((msgGroup) => {
+        const messageText = msgGroup.content.map((msg) => `${globalIndex++}. ${msg}`).join('\n');
+        return `${messageText}`;
+      })
+      .join('\n');
     navigator.clipboard
       .writeText(textToCopy)
       .then(() => {
@@ -94,6 +125,9 @@ const UserMessagesList: React.FC = () => {
             >
               Copy Messages
             </button>
+            <div className="text-gray-700 ml-4 flex-1 text-center py-2 bg-blue-100 rounded-lg">
+              {messagesCount} Messages
+            </div>
           </div>
 
           {copySuccess && (
@@ -104,13 +138,21 @@ const UserMessagesList: React.FC = () => {
 
           <div className="mt-4 p-4 bg-gray-100 border border-gray-300 rounded-lg">
             <h4 className="text-lg font-semibold text-blue-800 mb-2">User Messages:</h4>
-            <ol className="list-decimal list-inside text-gray-700 space-y-1">
-              {userMessages.map((message, index) => (
-                <li key={index} className="cursor-pointer select-text">
-                  {message}
-                </li>
-              ))}
-            </ol>
+            {userMessages.map((msgGroup, index) => (
+              <div key={index} className="mb-4">
+                <h5 className="text-blue-700 font-semibold">{msgGroup.fileName}</h5>
+                <ol className="list-decimal list-inside text-gray-700 space-y-1">
+                  {msgGroup.content.map((message, idx) => (
+                    <li
+                      key={idx}
+                      className="cursor-pointer select-text text-left leading-relaxed" // Left-aligned and increased line-height
+                    >
+                      {message}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            ))}
           </div>
         </>
       ) : (
