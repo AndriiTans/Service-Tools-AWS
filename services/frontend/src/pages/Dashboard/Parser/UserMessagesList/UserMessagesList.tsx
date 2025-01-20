@@ -60,7 +60,7 @@ const UserMessagesList: React.FC = () => {
   };
 
   const handleCopy = () => {
-    const textToCopy = userMessages.join('\n');
+    const textToCopy = userMessages.map((msg, idx) => `${idx + 1}. ${msg}`).join('\n');
     navigator.clipboard
       .writeText(textToCopy)
       .then(() => {
@@ -104,13 +104,13 @@ const UserMessagesList: React.FC = () => {
 
           <div className="mt-4 p-4 bg-gray-100 border border-gray-300 rounded-lg">
             <h4 className="text-lg font-semibold text-blue-800 mb-2">User Messages:</h4>
-            <ul className="list-disc list-inside text-gray-700 space-y-1">
+            <ol className="list-decimal list-inside text-gray-700 space-y-1">
               {userMessages.map((message, index) => (
                 <li key={index} className="cursor-pointer select-text">
                   {message}
                 </li>
               ))}
-            </ul>
+            </ol>
           </div>
         </>
       ) : (
