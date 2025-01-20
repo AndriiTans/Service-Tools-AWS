@@ -11,6 +11,7 @@ import {
   ParserResults,
   Register,
   Upload,
+  UserMessagesList,
 } from './pages';
 import NonAuthLayout from './NonAuthLayout';
 import { AuthProvider } from './contexts/AuthContext';
@@ -62,6 +63,7 @@ const AppContent = () => {
           <Route index element={<Navigate to="upload" replace />} />
           <Route path="upload" element={<Upload />} />
           <Route path="results" element={<ParserResults />} />
+          <Route path="user-messages" element={<UserMessagesList />} />
           <Route path="results/file/:id" element={<ParserResultDetails />} />
         </Route>
       </Route>

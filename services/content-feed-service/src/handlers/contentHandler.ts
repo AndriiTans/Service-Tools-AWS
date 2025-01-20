@@ -12,7 +12,7 @@ export const getParsedContent = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    const messages = await Message.find({ fileName }).sort({ order: 1 }).exec(); // Sort by 'order' in ascending order
+    const messages = await Message.find({ fileName }).sort({ order: 1 }).exec();
 
     if (!messages || messages.length === 0) {
       res.status(404).json({ message: 'No messages found matching the criteria.' });
@@ -28,15 +28,12 @@ export const getParsedContent = async (req: Request, res: Response): Promise<voi
 
 export const getUniqueFilenames = async (req: Request, res: Response): Promise<void> => {
   try {
-    console.log('uniqueFilenames -> ');
     const uniqueFilenames = await Message.distinct('fileName');
 
     if (!uniqueFilenames || uniqueFilenames.length === 0) {
       res.status(404).json({ message: 'No filenames found' });
       return;
     }
-
-    console.log('uniqueFilenames ', uniqueFilenames);
 
     res.status(200).json(uniqueFilenames);
   } catch (error) {
@@ -47,7 +44,7 @@ export const getUniqueFilenames = async (req: Request, res: Response): Promise<v
 
 export const getAllUserMessagesInAllFiles = async (req: Request, res: Response): Promise<void> => {
   try {
-    const userMessages = await Message.find({ authorRole: USER_ROLE }).lean();
+    const userMessages = await Message.find({ authorRole: USER_ROLE }).sort({ order: 1 }).lean();
 
     if (!userMessages.length) {
       res.status(404).json({ message: 'No user messages found' });
@@ -55,7 +52,6 @@ export const getAllUserMessagesInAllFiles = async (req: Request, res: Response):
     }
 
     const messages = userMessages.map((el) => el.content);
-    //
     res.status(200).json(messages);
   } catch (error) {
     console.error('Error fetching all user messages:', error.message, error.stack);
@@ -67,23 +63,26 @@ export const getAllUserMessagesByFilename = async (req: Request, res: Response):
   try {
     const { fileNames } = req.body;
 
-    if (!fileNames.length) {
-      res.status(400).json({ error: 'fileNames parameter is required' });
+    if (!fileNames || !Array.isArray(fileNames) || fileNames.length === 0) {
+      res
+        .status(400)
+        .json({ error: 'fileNames parameter is required and should be a non-empty array.' });
       return;
     }
 
     const userMessages = await Message.find({
       fileName: { $in: fileNames },
       authorRole: USER_ROLE,
-    }).lean();
+    })
+      .sort({ order: 1 })
+      .lean();
 
     if (!userMessages.length) {
-      res.status(404).json({ message: 'No user messages found for the specified file' });
+      res.status(404).json({ message: 'No user messages found for the specified files' });
       return;
     }
 
     const messages = userMessages.map((el) => el.content);
-
     res.status(200).json(messages);
   } catch (error) {
     console.error('Error fetching user messages by filename:', error.message, error.stack);
